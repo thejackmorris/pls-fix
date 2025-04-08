@@ -1,16 +1,43 @@
 'use client';
 
-import { forwardRef } from 'react';
+import { forwardRef, useCallback } from 'react';
 import { Discussion } from '@/generated/prisma';
 
 interface TextPanelProps {
   content: string;
   discussions: Discussion[];
   onScroll: () => void;
+  onCreateDiscussion: (startIndex: number, endIndex: number, selectedText: string) => void;
 }
 
 const TextPanel = forwardRef<HTMLDivElement, TextPanelProps>(
-  ({ content, discussions, onScroll }, ref) => {
+  ({ content, discussions, onScroll, onCreateDiscussion }, ref) => {
+    const handleSelection = useCallback(() => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+
+      const range = selection.getRangeAt(0);
+      const selectedText = selection.toString().trim();
+
+      if (!selectedText) return;
+
+      // Get the container element
+      const container = range.commonAncestorContainer.parentElement;
+      if (!container) return;
+
+      // Calculate the absolute start and end indices
+      const startIndex = range.startOffset;
+      const endIndex = range.endOffset;
+
+      if (startIndex === endIndex) return;
+
+      // Create a new discussion
+      onCreateDiscussion(startIndex, endIndex, selectedText);
+
+      // Clear the selection
+      selection.removeAllRanges();
+    }, [onCreateDiscussion]);
+
     // Function to render content with highlighted discussions
     const renderContent = () => {
       let lastIndex = 0;
@@ -62,7 +89,10 @@ const TextPanel = forwardRef<HTMLDivElement, TextPanelProps>(
         onScroll={onScroll}
       >
         <div className="max-w-prose mx-auto">
-          <div className="whitespace-pre-wrap text-lg leading-relaxed">
+          <div 
+            className="whitespace-pre-wrap text-lg leading-relaxed"
+            onMouseUp={handleSelection}
+          >
             {renderContent()}
           </div>
         </div>

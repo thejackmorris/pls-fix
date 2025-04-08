@@ -10,8 +10,9 @@ interface ReaderProps {
   discussions: Discussion[];
 }
 
-export default function Reader({ subject, discussions }: ReaderProps) {
+export default function Reader({ subject, discussions: initialDiscussions }: ReaderProps) {
   const [currentPosition, setCurrentPosition] = useState(0);
+  const [discussions, setDiscussions] = useState<Discussion[]>(initialDiscussions);
   const [activeDiscussions, setActiveDiscussions] = useState<Discussion[]>([]);
   const textPanelRef = useRef<HTMLDivElement>(null);
 
@@ -25,12 +26,28 @@ export default function Reader({ subject, discussions }: ReaderProps) {
     
     // Calculate which discussions are in view
     const visible = discussions.filter(discussion => {
-      const discussionPosition = discussion.startIndex; // This is simplified, you might want to use pixel positions
+      const discussionPosition = discussion.startIndex;
       return discussionPosition >= viewportStart && discussionPosition <= viewportEnd;
     });
     
     setActiveDiscussions(visible);
     setCurrentPosition(scrollTop);
+  };
+
+  // Handle text selection to create new discussion
+  const handleCreateDiscussion = (startIndex: number, endIndex: number, selectedText: string) => {
+    const newDiscussion: Discussion = {
+      id: Date.now().toString(), // temporary ID
+      startIndex,
+      endIndex,
+      snippet: selectedText,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      subjectId: subject.id,
+      userId: '1', // temporary userID
+    };
+
+    setDiscussions(prev => [...prev, newDiscussion]);
   };
 
   return (
@@ -42,6 +59,7 @@ export default function Reader({ subject, discussions }: ReaderProps) {
           content={subject.content}
           discussions={discussions}
           onScroll={handleScroll}
+          onCreateDiscussion={handleCreateDiscussion}
         />
       </div>
 
@@ -50,6 +68,10 @@ export default function Reader({ subject, discussions }: ReaderProps) {
         <DiscussionPanel
           discussions={activeDiscussions}
           currentPosition={currentPosition}
+          onCommentAdd={(discussionId: string, content: string) => {
+            // This will be replaced with an API call later
+            console.log('New comment:', { discussionId, content });
+          }}
         />
       </div>
     </div>
