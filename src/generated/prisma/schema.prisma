@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  subjects    Subject[]    @relation("UserSubjects")
+  discussions Discussion[] @relation("UserDiscussions")
+  comments    Comment[]    @relation("UserComments")
+}
+
+model Subject {
+  id          String       @id @default(cuid())
+  title       String
+  content     String // The actual text content
+  url         String? // Optional source URL
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  userId      String
+  user        User         @relation("UserSubjects", fields: [userId], references: [id])
+  discussions Discussion[]
+}
+
+model Discussion {
+  id         String    @id @default(cuid())
+  startIndex Int // Where in the text this discussion starts
+  endIndex   Int // Where in the text this discussion ends
+  snippet    String // The actual text snippet being discussed
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  subjectId  String
+  userId     String
+  subject    Subject   @relation(fields: [subjectId], references: [id])
+  user       User      @relation("UserDiscussions", fields: [userId], references: [id])
+  comments   Comment[]
+}
+
+model Comment {
+  id           String     @id @default(cuid())
+  content      String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  discussionId String
+  userId       String
+  discussion   Discussion @relation(fields: [discussionId], references: [id])
+  user         User       @relation("UserComments", fields: [userId], references: [id])
+  parentId     String?
+  parent       Comment?   @relation("CommentReplies", fields: [parentId], references: [id])
+  replies      Comment[]  @relation("CommentReplies")
+}
