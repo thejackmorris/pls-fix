@@ -130,48 +130,49 @@ exports.Prisma.SubjectScalarFieldEnum = {
   title: 'title',
   content: 'content',
   url: 'url',
+  userId: 'userId',
   isPrivate: 'isPrivate',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  userId: 'userId'
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.DiscussionScalarFieldEnum = {
   id: 'id',
+  subjectId: 'subjectId',
+  userId: 'userId',
   startIndex: 'startIndex',
   endIndex: 'endIndex',
-  snippet: 'snippet',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  subjectId: 'subjectId',
-  userId: 'userId'
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.CommentScalarFieldEnum = {
   id: 'id',
   content: 'content',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
+  startIndex: 'startIndex',
+  endIndex: 'endIndex',
   discussionId: 'discussionId',
   userId: 'userId',
-  parentId: 'parentId'
+  parentId: 'parentId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.CollectionScalarFieldEnum = {
   id: 'id',
   name: 'name',
   description: 'description',
-  isPrivate: 'isPrivate',
+  userId: 'userId',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  userId: 'userId'
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.UserRelationshipScalarFieldEnum = {
   id: 'id',
   followerId: 'followerId',
   followingId: 'followingId',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SubjectPermissionScalarFieldEnum = {
@@ -186,7 +187,8 @@ exports.Prisma.SubjectPermissionScalarFieldEnum = {
 exports.Prisma.TagScalarFieldEnum = {
   id: 'id',
   name: 'name',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SortOrder = {

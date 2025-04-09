@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    const { subjectId, startIndex, endIndex, snippet } = await request.json();
+    const { subjectId, startIndex, endIndex } = await request.json();
 
     // First, ensure we have a user
     let user = await prisma.user.findFirst();
@@ -50,7 +50,6 @@ export async function POST(request: Request) {
       data: {
         startIndex,
         endIndex,
-        snippet,
         subjectId,
         userId: user.id,
       },

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Subject, Discussion } from '@/generated/prisma';
+import { Subject, Discussion, AccessRole } from '@/generated/prisma';
 import TextPanel from './TextPanel';
 import DiscussionPanel from './DiscussionPanel';
 
@@ -9,12 +9,21 @@ interface ReaderProps {
   subject: Subject;
   discussions: Discussion[];
   onDiscussionsChange: (discussions: Discussion[]) => void;
+  userRole?: AccessRole;
+  isOwner: boolean;
 }
 
-export default function Reader({ subject, discussions: initialDiscussions, onDiscussionsChange }: ReaderProps) {
+export default function Reader({ 
+  subject, 
+  discussions: initialDiscussions, 
+  onDiscussionsChange,
+  userRole,
+  isOwner 
+}: ReaderProps) {
   const [currentPosition, setCurrentPosition] = useState(0);
   const [discussions, setDiscussions] = useState<Discussion[]>(initialDiscussions);
   const [activeDiscussions, setActiveDiscussions] = useState<Discussion[]>([]);
+  const [selectedDiscussion, setSelectedDiscussion] = useState<Discussion | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textPanelRef = useRef<HTMLDivElement>(null);
@@ -128,10 +137,12 @@ export default function Reader({ subject, discussions: initialDiscussions, onDis
         <TextPanel
           ref={textPanelRef}
           content={subject.content}
-          discussions={discussions}
+          comments={discussions}
           onScroll={handleScroll}
-          onCreateDiscussion={handleCreateDiscussion}
+          onCreateComment={handleCreateDiscussion}
           isLoading={isLoading}
+          userRole={userRole}
+          isOwner={isOwner}
         />
       </div>
 
@@ -139,8 +150,10 @@ export default function Reader({ subject, discussions: initialDiscussions, onDis
       <div className="w-2/5 h-full">
         <DiscussionPanel
           discussions={activeDiscussions}
-          currentPosition={currentPosition}
-          onCommentAdd={handleCommentAdd}
+          selectedDiscussion={selectedDiscussion}
+          onSelectDiscussion={setSelectedDiscussion}
+          onCreateDiscussion={() => {}}
+          onScroll={handleScroll}
           isLoading={isLoading}
         />
       </div>

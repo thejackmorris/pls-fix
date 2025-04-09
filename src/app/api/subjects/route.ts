@@ -1,41 +1,47 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@/generated/prisma';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 export async function POST(request: Request) {
   try {
-    const { title, content, url, isPrivate = true } = await request.json();
+    const { title, content, isPrivate = true } = await request.json();
 
-    // First, ensure we have a user
-    let user = await prisma.user.findFirst();
-    if (!user) {
-      // Create a default user if none exists
-      user = await prisma.user.create({
-        data: {
-          email: 'default@example.com',
-          name: 'Default User',
-        },
-      });
-    }
+    // Ensure the default user exists
+    const defaultUser = await prisma.user.upsert({
+      where: { email: 'default@example.com' },
+      update: {},
+      create: {
+        email: 'default@example.com',
+        name: 'Default User',
+      },
+    });
 
+    // Create the subject with the default user as owner and create a discussion
     const subject = await prisma.subject.create({
       data: {
         title,
         content,
-        url,
         isPrivate,
-        userId: user.id,
+        userId: defaultUser.id,
         permissions: {
           create: {
-            userId: user.id,
-            role: 'OWNER'
-          }
-        }
+            userId: defaultUser.id,
+            role: 'OWNER',
+          },
+        },
+        discussion: {
+          create: {
+            userId: defaultUser.id,
+          },
+        },
       },
       include: {
-        permissions: true
-      }
+        permissions: true,
+        discussion: {
+          include: {
+            comments: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json(subject);
@@ -48,46 +54,49 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // First, ensure we have a user
-    let user = await prisma.user.findFirst();
+    // For now, we'll use a simple check to determine if the user can access subjects
+    // In a real app, you'd want to check the user's session and permissions
+    const userEmail = 'default@example.com'; // This would come from your auth system
+
+    // Find the user
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+    });
+
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
-        { status: 401 }
+        { status: 404 }
       );
     }
 
-    // Fetch subjects that are either:
-    // 1. Public
-    // 2. Owned by the user
-    // 3. User has explicit permissions
+    // Get all subjects where:
+    // 1. The user is the owner, OR
+    // 2. The subject is public, OR
+    // 3. The user has explicit permissions
     const subjects = await prisma.subject.findMany({
       where: {
         OR: [
-          { isPrivate: false },
           { userId: user.id },
+          { isPrivate: false },
           {
             permissions: {
               some: {
-                userId: user.id
-              }
-            }
-          }
-        ]
+                userId: user.id,
+              },
+            },
+          },
+        ],
       },
       include: {
-        discussions: {
+        permissions: true,
+        discussion: {
           include: {
             comments: true,
           },
         },
-        permissions: {
-          where: {
-            userId: user.id
-          }
-        }
       },
     });
 

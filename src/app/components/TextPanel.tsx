@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useState, useEffect, RefObject } from 'react';
+import { forwardRef, useState, RefObject } from 'react';
 import { Discussion, AccessRole } from '@/generated/prisma';
 
 interface TextPanelProps {
@@ -13,127 +13,97 @@ interface TextPanelProps {
   isOwner: boolean;
 }
 
-const TextPanel = forwardRef<HTMLDivElement, TextPanelProps>(({
-  content,
-  discussions,
-  onScroll,
-  onCreateDiscussion,
-  isLoading,
-  userRole,
-  isOwner
-}, ref) => {
-  const [selectedText, setSelectedText] = useState<string>('');
-  const [selectionStart, setSelectionStart] = useState<number>(0);
-  const [selectionEnd, setSelectionEnd] = useState<number>(0);
-  const [showCreateButton, setShowCreateButton] = useState(false);
-  const [buttonPosition, setButtonPosition] = useState({ x: 0, y: 0 });
+const TextPanel = forwardRef<HTMLDivElement, TextPanelProps>(
+  ({ content, discussions, onScroll, onCreateDiscussion, isLoading, userRole, isOwner }, ref) => {
+    const [selectedText, setSelectedText] = useState<{
+      text: string;
+      startIndex: number;
+      endIndex: number;
+    } | null>(null);
 
-  const canCreateDiscussion = isOwner || userRole === 'EDITOR' || userRole === 'COMMENTER';
+    const handleSelection = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) {
+        setSelectedText(null);
+        return;
+      }
 
-  const handleSelection = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !canCreateDiscussion) {
-      setShowCreateButton(false);
-      return;
-    }
+      const range = selection.getRangeAt(0);
+      const preSelectionRange = range.cloneRange();
+      const element = (ref as RefObject<HTMLDivElement>).current;
+      if (!element) return;
+      
+      preSelectionRange.selectNodeContents(element);
+      preSelectionRange.setEnd(range.startContainer, range.startOffset);
+      const startIndex = preSelectionRange.toString().length;
+      const endIndex = startIndex + range.toString().length;
 
-    const range = selection.getRangeAt(0);
-    const element = (ref as RefObject<HTMLDivElement>).current;
-    if (!element) return;
-
-    const preSelectionRange = range.cloneRange();
-    preSelectionRange.selectNodeContents(element);
-    preSelectionRange.setEnd(range.startContainer, range.startOffset);
-    const start = preSelectionRange.toString().length;
-    const end = start + range.toString().length;
-
-    const selectedContent = selection.toString().trim();
-    if (selectedContent) {
-      setSelectedText(selectedContent);
-      setSelectionStart(start);
-      setSelectionEnd(end);
-
-      // Position the create button near the selection
-      const rect = range.getBoundingClientRect();
-      setButtonPosition({
-        x: rect.left + (rect.width / 2),
-        y: rect.bottom + window.scrollY + 10
+      setSelectedText({
+        text: range.toString(),
+        startIndex,
+        endIndex,
       });
-      setShowCreateButton(true);
-    }
-  };
-
-  const handleCreateDiscussion = () => {
-    if (selectedText && canCreateDiscussion) {
-      onCreateDiscussion(selectionStart, selectionEnd, selectedText);
-      setSelectedText('');
-      setShowCreateButton(false);
-    }
-  };
-
-  useEffect(() => {
-    const element = (ref as RefObject<HTMLDivElement>).current;
-    if (!element) return;
-
-    element.addEventListener('mouseup', handleSelection);
-
-    return () => {
-      element.removeEventListener('mouseup', handleSelection);
     };
-  }, [canCreateDiscussion]);
 
-  return (
-    <div className="relative h-full overflow-y-auto bg-white" ref={ref} onScroll={onScroll}>
-      {isLoading && (
-        <div className="sticky top-4 left-4 z-50 p-2 bg-blue-50 text-blue-700 rounded-lg shadow-md">
-          Loading...
-        </div>
-      )}
-      
-      {!canCreateDiscussion && (
-        <div className="sticky top-4 left-4 z-50 p-2 bg-yellow-50 text-yellow-700 rounded-lg shadow-md">
-          View Only
-        </div>
-      )}
-      
-      <div className="prose prose-lg max-w-none p-6">
-        {content.split('\n').map((paragraph, index) => (
-          <p key={index} className="mb-4 text-gray-800 leading-relaxed">
-            {paragraph}
-          </p>
-        ))}
-      </div>
+    const canCreateDiscussion = isOwner || userRole === 'EDITOR' || userRole === 'COMMENTER';
 
-      {discussions.map(discussion => (
+    return (
+      <div className="relative h-full overflow-auto" ref={ref} onScroll={onScroll}>
         <div
-          key={discussion.id}
-          className="absolute left-0 right-0"
-          style={{
-            top: `${discussion.startIndex}px`,
-            height: `${discussion.endIndex - discussion.startIndex}px`,
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderLeft: '3px solid rgb(59, 130, 246)',
-            pointerEvents: 'none',
-          }}
-        />
-      ))}
-
-      {showCreateButton && canCreateDiscussion && (
-        <button
-          className="absolute z-50 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-colors"
-          style={{
-            left: `${buttonPosition.x}px`,
-            top: `${buttonPosition.y}px`,
-            transform: 'translateX(-50%)',
-          }}
-          onClick={handleCreateDiscussion}
+          className="p-4 prose max-w-none"
+          onMouseUp={handleSelection}
+          onTouchEnd={handleSelection}
         >
-          Start Discussion
-        </button>
-      )}
-    </div>
-  );
-});
+          {content.split('').map((char, index) => {
+            const discussion = discussions.find(
+              (d) => d.startIndex !== undefined && d.endIndex !== undefined && 
+                    index >= d.startIndex && index < d.endIndex
+            );
+
+            return (
+              <span
+                key={index}
+                className={discussion ? 'bg-yellow-100' : ''}
+                data-index={index}
+              >
+                {char}
+              </span>
+            );
+          })}
+        </div>
+
+        {selectedText && canCreateDiscussion && (
+          <div className="absolute bottom-4 right-4">
+            <button
+              onClick={() => {
+                if (selectedText) {
+                  onCreateDiscussion(
+                    selectedText.startIndex,
+                    selectedText.endIndex,
+                    selectedText.text
+                  );
+                  setSelectedText(null);
+                }
+              }}
+              disabled={isLoading}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+            >
+              {isLoading ? 'Creating...' : 'Add Discussion'}
+            </button>
+          </div>
+        )}
+
+        {selectedText && !canCreateDiscussion && (
+          <div className="absolute bottom-4 right-4">
+            <div className="bg-gray-100 text-gray-600 px-4 py-2 rounded-md">
+              You don't have permission to add discussions
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+);
 
 TextPanel.displayName = 'TextPanel';
 
