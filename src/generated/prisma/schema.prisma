@@ -14,27 +14,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AccessRole {
+  OWNER
+  EDITOR
+  COMMENTER
+  VIEWER
+}
+
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  name        String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  subjects    Subject[]    @relation("UserSubjects")
-  discussions Discussion[] @relation("UserDiscussions")
-  comments    Comment[]    @relation("UserComments")
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  name               String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  subjects           Subject[]           @relation("UserSubjects")
+  discussions        Discussion[]        @relation("UserDiscussions")
+  comments           Comment[]           @relation("UserComments")
+  collections        Collection[]        @relation("UserCollections")
+  followers          UserRelationship[]  @relation("UserFollowers")
+  following          UserRelationship[]  @relation("UserFollowing")
+  subjectPermissions SubjectPermission[]
 }
 
 model Subject {
-  id          String       @id @default(cuid())
+  id          String              @id @default(cuid())
   title       String
   content     String // The actual text content
   url         String? // Optional source URL
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  isPrivate   Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   userId      String
-  user        User         @relation("UserSubjects", fields: [userId], references: [id])
+  user        User                @relation("UserSubjects", fields: [userId], references: [id])
   discussions Discussion[]
+  collections Collection[]        @relation("CollectionSubjects")
+  permissions SubjectPermission[]
+  tags        Tag[]               @relation("SubjectTags")
 }
 
 model Discussion {
@@ -63,4 +78,47 @@ model Comment {
   parentId     String?
   parent       Comment?   @relation("CommentReplies", fields: [parentId], references: [id])
   replies      Comment[]  @relation("CommentReplies")
+}
+
+model Collection {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  isPrivate   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  userId      String
+  user        User      @relation("UserCollections", fields: [userId], references: [id])
+  subjects    Subject[] @relation("CollectionSubjects")
+}
+
+model UserRelationship {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("UserFollowers", fields: [followerId], references: [id])
+  following   User     @relation("UserFollowing", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+}
+
+model SubjectPermission {
+  id        String     @id @default(cuid())
+  subjectId String
+  userId    String
+  role      AccessRole @default(VIEWER)
+  subject   Subject    @relation(fields: [subjectId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([subjectId, userId])
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  subjects  Subject[] @relation("SubjectTags")
 }

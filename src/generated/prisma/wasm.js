@@ -130,6 +130,7 @@ exports.Prisma.SubjectScalarFieldEnum = {
   title: 'title',
   content: 'content',
   url: 'url',
+  isPrivate: 'isPrivate',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   userId: 'userId'
@@ -156,6 +157,38 @@ exports.Prisma.CommentScalarFieldEnum = {
   parentId: 'parentId'
 };
 
+exports.Prisma.CollectionScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  isPrivate: 'isPrivate',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  userId: 'userId'
+};
+
+exports.Prisma.UserRelationshipScalarFieldEnum = {
+  id: 'id',
+  followerId: 'followerId',
+  followingId: 'followingId',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.SubjectPermissionScalarFieldEnum = {
+  id: 'id',
+  subjectId: 'subjectId',
+  userId: 'userId',
+  role: 'role',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.TagScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -170,13 +203,22 @@ exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
 };
-
+exports.AccessRole = exports.$Enums.AccessRole = {
+  OWNER: 'OWNER',
+  EDITOR: 'EDITOR',
+  COMMENTER: 'COMMENTER',
+  VIEWER: 'VIEWER'
+};
 
 exports.Prisma.ModelName = {
   User: 'User',
   Subject: 'Subject',
   Discussion: 'Discussion',
-  Comment: 'Comment'
+  Comment: 'Comment',
+  Collection: 'Collection',
+  UserRelationship: 'UserRelationship',
+  SubjectPermission: 'SubjectPermission',
+  Tag: 'Tag'
 };
 
 /**

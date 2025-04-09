@@ -5,15 +5,37 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    const { title, content, url } = await request.json();
+    const { title, content, url, isPrivate = true } = await request.json();
+
+    // First, ensure we have a user
+    let user = await prisma.user.findFirst();
+    if (!user) {
+      // Create a default user if none exists
+      user = await prisma.user.create({
+        data: {
+          email: 'default@example.com',
+          name: 'Default User',
+        },
+      });
+    }
 
     const subject = await prisma.subject.create({
       data: {
         title,
         content,
         url,
-        userId: '1', // TODO: Replace with actual user ID from auth
+        isPrivate,
+        userId: user.id,
+        permissions: {
+          create: {
+            userId: user.id,
+            role: 'OWNER'
+          }
+        }
       },
+      include: {
+        permissions: true
+      }
     });
 
     return NextResponse.json(subject);
@@ -28,13 +50,44 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
+    // First, ensure we have a user
+    let user = await prisma.user.findFirst();
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 401 }
+      );
+    }
+
+    // Fetch subjects that are either:
+    // 1. Public
+    // 2. Owned by the user
+    // 3. User has explicit permissions
     const subjects = await prisma.subject.findMany({
+      where: {
+        OR: [
+          { isPrivate: false },
+          { userId: user.id },
+          {
+            permissions: {
+              some: {
+                userId: user.id
+              }
+            }
+          }
+        ]
+      },
       include: {
         discussions: {
           include: {
             comments: true,
           },
         },
+        permissions: {
+          where: {
+            userId: user.id
+          }
+        }
       },
     });
 
