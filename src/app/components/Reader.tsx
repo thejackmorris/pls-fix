@@ -8,13 +8,33 @@ import DiscussionPanel from './DiscussionPanel';
 interface ReaderProps {
   subject: Subject;
   discussions: Discussion[];
+  onDiscussionsChange: (discussions: Discussion[]) => void;
 }
 
-export default function Reader({ subject, discussions: initialDiscussions }: ReaderProps) {
+export default function Reader({ subject, discussions: initialDiscussions, onDiscussionsChange }: ReaderProps) {
   const [currentPosition, setCurrentPosition] = useState(0);
   const [discussions, setDiscussions] = useState<Discussion[]>(initialDiscussions);
   const [activeDiscussions, setActiveDiscussions] = useState<Discussion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const textPanelRef = useRef<HTMLDivElement>(null);
+
+  // Load discussions when subject changes
+  useEffect(() => {
+    const loadDiscussions = async () => {
+      try {
+        const response = await fetch(`/api/discussions?subjectId=${subject.id}`);
+        if (!response.ok) throw new Error('Failed to fetch discussions');
+        const data = await response.json();
+        setDiscussions(data);
+        onDiscussionsChange(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load discussions');
+      }
+    };
+
+    loadDiscussions();
+  }, [subject.id, onDiscussionsChange]);
 
   // Update active discussions based on scroll position
   const handleScroll = () => {
@@ -24,7 +44,6 @@ export default function Reader({ subject, discussions: initialDiscussions }: Rea
     const viewportStart = scrollTop;
     const viewportEnd = scrollTop + clientHeight;
     
-    // Calculate which discussions are in view
     const visible = discussions.filter(discussion => {
       const discussionPosition = discussion.startIndex;
       return discussionPosition >= viewportStart && discussionPosition <= viewportEnd;
@@ -35,23 +54,75 @@ export default function Reader({ subject, discussions: initialDiscussions }: Rea
   };
 
   // Handle text selection to create new discussion
-  const handleCreateDiscussion = (startIndex: number, endIndex: number, selectedText: string) => {
-    const newDiscussion: Discussion = {
-      id: Date.now().toString(), // temporary ID
-      startIndex,
-      endIndex,
-      snippet: selectedText,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      subjectId: subject.id,
-      userId: '1', // temporary userID
-    };
+  const handleCreateDiscussion = async (startIndex: number, endIndex: number, selectedText: string) => {
+    setIsLoading(true);
+    setError(null);
 
-    setDiscussions(prev => [...prev, newDiscussion]);
+    try {
+      const response = await fetch('/api/discussions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subjectId: subject.id,
+          startIndex,
+          endIndex,
+          snippet: selectedText,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to create discussion');
+
+      const newDiscussion = await response.json();
+      setDiscussions(prev => [...prev, newDiscussion]);
+      onDiscussionsChange([...discussions, newDiscussion]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create discussion');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle adding a new comment
+  const handleCommentAdd = async (discussionId: string, content: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          discussionId,
+          content,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to add comment');
+
+      // Refresh discussions to get the new comment
+      const discussionsResponse = await fetch(`/api/discussions?subjectId=${subject.id}`);
+      if (!discussionsResponse.ok) throw new Error('Failed to refresh discussions');
+      const updatedDiscussions = await discussionsResponse.json();
+      setDiscussions(updatedDiscussions);
+      onDiscussionsChange(updatedDiscussions);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add comment');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="flex h-screen">
+      {error && (
+        <div className="absolute top-4 right-4 p-4 bg-red-50 text-red-700 rounded-lg shadow-lg">
+          {error}
+        </div>
+      )}
       {/* Text Panel - Takes 60% of the width */}
       <div className="w-3/5 h-full border-r border-gray-200">
         <TextPanel
@@ -60,6 +131,7 @@ export default function Reader({ subject, discussions: initialDiscussions }: Rea
           discussions={discussions}
           onScroll={handleScroll}
           onCreateDiscussion={handleCreateDiscussion}
+          isLoading={isLoading}
         />
       </div>
 
@@ -68,10 +140,8 @@ export default function Reader({ subject, discussions: initialDiscussions }: Rea
         <DiscussionPanel
           discussions={activeDiscussions}
           currentPosition={currentPosition}
-          onCommentAdd={(discussionId: string, content: string) => {
-            // This will be replaced with an API call later
-            console.log('New comment:', { discussionId, content });
-          }}
+          onCommentAdd={handleCommentAdd}
+          isLoading={isLoading}
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useCallback } from 'react';
+import { forwardRef, useState, useEffect, RefObject } from 'react';
 import { Discussion } from '@/generated/prisma';
 
 interface TextPanelProps {
@@ -8,98 +8,90 @@ interface TextPanelProps {
   discussions: Discussion[];
   onScroll: () => void;
   onCreateDiscussion: (startIndex: number, endIndex: number, selectedText: string) => void;
+  isLoading: boolean;
 }
 
-const TextPanel = forwardRef<HTMLDivElement, TextPanelProps>(
-  ({ content, discussions, onScroll, onCreateDiscussion }, ref) => {
-    const handleSelection = useCallback(() => {
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) return;
+const TextPanel = forwardRef<HTMLDivElement, TextPanelProps>(({
+  content,
+  discussions,
+  onScroll,
+  onCreateDiscussion,
+  isLoading
+}, ref) => {
+  const [selectedText, setSelectedText] = useState<string>('');
+  const [selectionStart, setSelectionStart] = useState<number>(0);
+  const [selectionEnd, setSelectionEnd] = useState<number>(0);
 
-      const range = selection.getRangeAt(0);
-      const selectedText = selection.toString().trim();
+  const handleSelection = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return;
 
-      if (!selectedText) return;
+    const range = selection.getRangeAt(0);
+    const element = (ref as RefObject<HTMLDivElement>).current;
+    if (!element) return;
 
-      // Get the container element
-      const container = range.commonAncestorContainer.parentElement;
-      if (!container) return;
+    const preSelectionRange = range.cloneRange();
+    preSelectionRange.selectNodeContents(element);
+    preSelectionRange.setEnd(range.startContainer, range.startOffset);
+    const start = preSelectionRange.toString().length;
+    const end = start + range.toString().length;
 
-      // Calculate the absolute start and end indices
-      const startIndex = range.startOffset;
-      const endIndex = range.endOffset;
+    setSelectedText(selection.toString());
+    setSelectionStart(start);
+    setSelectionEnd(end);
+  };
 
-      if (startIndex === endIndex) return;
+  const handleMouseUp = () => {
+    if (selectedText) {
+      onCreateDiscussion(selectionStart, selectionEnd, selectedText);
+      setSelectedText('');
+    }
+  };
 
-      // Create a new discussion
-      onCreateDiscussion(startIndex, endIndex, selectedText);
+  useEffect(() => {
+    const element = (ref as RefObject<HTMLDivElement>).current;
+    if (!element) return;
 
-      // Clear the selection
-      selection.removeAllRanges();
-    }, [onCreateDiscussion]);
+    element.addEventListener('mouseup', handleSelection);
+    element.addEventListener('mouseup', handleMouseUp);
 
-    // Function to render content with highlighted discussions
-    const renderContent = () => {
-      let lastIndex = 0;
-      const result = [];
-      
-      // Sort discussions by startIndex to process them in order
-      const sortedDiscussions = [...discussions].sort((a, b) => a.startIndex - b.startIndex);
-      
-      for (const discussion of sortedDiscussions) {
-        // Add text before the discussion
-        if (discussion.startIndex > lastIndex) {
-          result.push(
-            <span key={`text-${lastIndex}`}>
-              {content.slice(lastIndex, discussion.startIndex)}
-            </span>
-          );
-        }
-        
-        // Add highlighted discussion text
-        result.push(
-          <span
-            key={`highlight-${discussion.id}`}
-            className="bg-yellow-100 cursor-pointer hover:bg-yellow-200 transition-colors"
-            title="Click to view discussion"
-          >
-            {content.slice(discussion.startIndex, discussion.endIndex)}
-          </span>
-        );
-        
-        lastIndex = discussion.endIndex;
-      }
-      
-      // Add remaining text
-      if (lastIndex < content.length) {
-        result.push(
-          <span key={`text-${lastIndex}`}>
-            {content.slice(lastIndex)}
-          </span>
-        );
-      }
-      
-      return result;
+    return () => {
+      element.removeEventListener('mouseup', handleSelection);
+      element.removeEventListener('mouseup', handleMouseUp);
     };
+  }, [selectedText, selectionStart, selectionEnd]);
 
-    return (
-      <div
-        ref={ref}
-        className="h-full overflow-y-auto p-8"
-        onScroll={onScroll}
-      >
-        <div className="max-w-prose mx-auto">
-          <div 
-            className="whitespace-pre-wrap text-lg leading-relaxed"
-            onMouseUp={handleSelection}
-          >
-            {renderContent()}
-          </div>
+  return (
+    <div className="h-full overflow-y-auto p-6 bg-white" ref={ref} onScroll={onScroll}>
+      {isLoading && (
+        <div className="absolute top-4 left-4 p-2 bg-blue-50 text-blue-700 rounded-lg">
+          Loading...
         </div>
+      )}
+      <div className="prose max-w-none">
+        {content.split('\n').map((paragraph, index) => (
+          <p key={index} className="mb-4">
+            {paragraph}
+          </p>
+        ))}
       </div>
-    );
-  }
-);
+      {discussions.map(discussion => (
+        <div
+          key={discussion.id}
+          className="absolute"
+          style={{
+            top: `${discussion.startIndex}px`,
+            left: '0',
+            width: '100%',
+            height: `${discussion.endIndex - discussion.startIndex}px`,
+            backgroundColor: 'rgba(255, 255, 0, 0.2)',
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
+    </div>
+  );
+});
 
 TextPanel.displayName = 'TextPanel';
 
